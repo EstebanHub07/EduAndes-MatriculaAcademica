@@ -16,6 +16,7 @@ import java.util.List;
 @Data
 @NoArgsConstructor
 @AllArgsConstructor
+@Entity
 @Table(name = "matriculas")
 public class Matricula {
     @Id
@@ -43,10 +44,18 @@ public class Matricula {
     private LocalDateTime fechaModificacion;
     @PrePersist
     public void prePersist() {
-        this.fechaCreacion = LocalDateTime.now();
+
+        if (fecha == null) {
+            fecha = LocalDateTime.now();
+        }
+
+        if (estado == null) {
+            estado = EstadoMatricula.REGISTRADA;
+        }
     }
-    @PreUpdate
-    public void preUpdate () {
-        this.fechaModificacion = LocalDateTime.now();
+
+    public void agregarDetalle(DetalleMatricula detalle) {
+        detalles.add(detalle);
+        detalle.setMatricula(this);
     }
 }
