@@ -43,7 +43,7 @@ public class Matricula {
     private LocalDateTime fechaModificacion;
     @PrePersist
     public void prePersist() {
-
+        this.fechaCreacion = LocalDateTime.now();
         if (fecha == null) {
             fecha = LocalDateTime.now();
         }
