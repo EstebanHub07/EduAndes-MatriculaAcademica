@@ -8,9 +8,6 @@ import pe.edu.upeu.eduandes.dto.reporte.MatriculadosPorCursoDTO;
 import pe.edu.upeu.eduandes.repository.MatriculaRepository;
 import pe.edu.upeu.eduandes.service.service.ReporteService;
 
-import java.time.LocalDate;
-import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.List;
 
 @Service
@@ -25,28 +22,20 @@ public class ReporteServiceImpl implements ReporteService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<MatriculadosPorCursoDTO> matriculadosPorCurso(LocalDate desde, LocalDate hasta) {
-        validarRango(desde, hasta);
-
-        LocalDateTime desdeFechaHora = desde == null ? null : desde.atStartOfDay();
-        LocalDateTime hastaFechaHora = hasta == null ? null : hasta.atTime(LocalTime.MAX);
+    public List<MatriculadosPorCursoDTO> matriculadosPorCurso(String periodo, Long carreraId) {
+        if (periodo == null || !periodo.matches("^\\d{4}-[12]$")) {
+            throw new IllegalArgumentException("El periodo debe tener el formato YYYY-1 o YYYY-2");
+        }
         long inicio = System.currentTimeMillis();
 
-        log.info("Inicio reporte de matriculados por curso | desde={} | hasta={}", desde, hasta);
+        log.info("Inicio reporte de matriculados por curso | periodo={} | carreraId={}",
+                periodo, carreraId);
 
         List<MatriculadosPorCursoDTO> resultado =
-                matriculaRepository.reporteMatriculadosPorCurso(desdeFechaHora, hastaFechaHora);
+                matriculaRepository.reporteMatriculadosPorCurso(periodo, carreraId);
 
-        log.info("Fin reporte de matriculados por curso | desde={} | hasta={} | filas={} | duracionMs={}",
-                desde, hasta, resultado.size(), System.currentTimeMillis() - inicio);
+        log.info("Fin reporte de matriculados por curso | periodo={} | carreraId={} | filas={} | duracionMs={}",
+                periodo, carreraId, resultado.size(), System.currentTimeMillis() - inicio);
         return resultado;
-    }
-
-    private void validarRango(LocalDate desde, LocalDate hasta) {
-        if (desde != null && hasta != null && desde.isAfter(hasta)) {
-            throw new IllegalArgumentException(
-                    "El rango de fechas es inválido: 'desde' (" + desde
-                            + ") es posterior a 'hasta' (" + hasta + ")");
-        }
     }
 }

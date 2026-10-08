@@ -8,12 +8,13 @@ import pe.edu.upeu.eduandes.dto.request.EstudianteRequestDTO;
 import pe.edu.upeu.eduandes.dto.response.EstudianteResponseDTO;
 import pe.edu.upeu.eduandes.entity.Carrera;
 import pe.edu.upeu.eduandes.entity.Estudiante;
+import pe.edu.upeu.eduandes.exception.RecursoNoEncontradoException;
+import pe.edu.upeu.eduandes.exception.ReglaNegocioException;
 import pe.edu.upeu.eduandes.repository.CarreraRepository;
 import pe.edu.upeu.eduandes.repository.EstudianteRepository;
 import pe.edu.upeu.eduandes.service.service.EstudianteService;
 
 import java.util.List;
-import java.util.NoSuchElementException;
 
 @Service
 public class EstudianteServiceImpl implements EstudianteService {
@@ -39,13 +40,13 @@ public class EstudianteServiceImpl implements EstudianteService {
         String email = normalizarEmail(request.getEmail());
 
         if (estudianteRepository.existsByDni(dni)) {
-            throw new IllegalArgumentException("Ya existe un estudiante con el DNI: " + dni);
+            throw new ReglaNegocioException("Ya existe un estudiante con el DNI: " + dni);
         }
         if (estudianteRepository.existsByEmailIgnoreCase(email)) {
-            throw new IllegalArgumentException("Ya existe un estudiante con el correo: " + email);
+            throw new ReglaNegocioException("Ya existe un estudiante con el correo: " + email);
         }
-        if (existeCodigo(codigo, null)) {
-            throw new IllegalArgumentException("Ya existe un estudiante con el código: " + codigo);
+        if (estudianteRepository.existsByCodigoIgnoreCase(codigo)) {
+            throw new ReglaNegocioException("Ya existe un estudiante con el código: " + codigo);
         }
 
         Carrera carrera = buscarCarreraActiva(request.getCarreraId());
@@ -88,13 +89,13 @@ public class EstudianteServiceImpl implements EstudianteService {
         String email = normalizarEmail(request.getEmail());
 
         if (estudianteRepository.existsByDniAndIdNot(dni, id)) {
-            throw new IllegalArgumentException("Ya existe otro estudiante con el DNI: " + dni);
+            throw new ReglaNegocioException("Ya existe otro estudiante con el DNI: " + dni);
         }
         if (estudianteRepository.existsByEmailIgnoreCaseAndIdNot(email, id)) {
-            throw new IllegalArgumentException("Ya existe otro estudiante con el correo: " + email);
+            throw new ReglaNegocioException("Ya existe otro estudiante con el correo: " + email);
         }
-        if (existeCodigo(codigo, id)) {
-            throw new IllegalArgumentException("Ya existe otro estudiante con el código: " + codigo);
+        if (estudianteRepository.existsByCodigoIgnoreCaseAndIdNot(codigo, id)) {
+            throw new ReglaNegocioException("Ya existe otro estudiante con el código: " + codigo);
         }
 
         estudiante.setCodigo(codigo);
@@ -120,14 +121,17 @@ public class EstudianteServiceImpl implements EstudianteService {
 
     private Estudiante buscarEstudiante(Long id) {
         return estudianteRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Estudiante no encontrado con id: " + id));
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "Estudiante no encontrado con id: " + id));
     }
 
     private Carrera buscarCarreraActiva(Long carreraId) {
         Carrera carrera = carreraRepository.findById(carreraId)
-                .orElseThrow(() -> new NoSuchElementException("Carrera no encontrada con id: " + carreraId));
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "Carrera no encontrada con id: " + carreraId));
         if (!Boolean.TRUE.equals(carrera.getEstado())) {
-            throw new IllegalArgumentException("No se puede asignar un estudiante a una carrera inactiva");
+            throw new ReglaNegocioException(
+                    "No se puede asignar un estudiante a una carrera inactiva");
         }
         return carrera;
     }
@@ -148,12 +152,6 @@ public class EstudianteServiceImpl implements EstudianteService {
 
     private String normalizarEmail(String email) {
         return email.trim().toLowerCase();
-    }
-
-    private boolean existeCodigo(String codigo, Long excluirId) {
-        return estudianteRepository.findAll().stream()
-                .anyMatch(estudiante -> estudiante.getCodigo().equalsIgnoreCase(codigo)
-                        && (excluirId == null || !estudiante.getId().equals(excluirId)));
     }
 
     private EstudianteResponseDTO convertirResponse(Estudiante estudiante) {

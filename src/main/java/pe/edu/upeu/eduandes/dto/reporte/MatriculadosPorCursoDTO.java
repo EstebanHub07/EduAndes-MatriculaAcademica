@@ -1,9 +1,11 @@
 package pe.edu.upeu.eduandes.dto.reporte;
 
+import java.math.BigDecimal;
+
 public record MatriculadosPorCursoDTO(
-        Long cursoId,
         String codigo,
         String curso,
-        Long matriculados
+        Long matriculados,
+        BigDecimal montoRecaudado
 ) {
 }

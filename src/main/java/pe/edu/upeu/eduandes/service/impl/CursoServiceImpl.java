@@ -1,6 +1,5 @@
 package pe.edu.upeu.eduandes.service.impl;
 
-import jakarta.persistence.criteria.Expression;
 import jakarta.persistence.criteria.Predicate;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -153,27 +152,22 @@ public class CursoServiceImpl implements CursoService {
 
             if (ciclo != null) {
                 condiciones.add(
-                        cb.equal(root.get("ciclo"), ciclo.toString())
+                        cb.equal(root.get("ciclo"), ciclo)
                 );
             }
 
             if (conVacantes != null) {
-                Expression<Integer> vacantes = root.get("vacantes").as(Integer.class);
                 condiciones.add(
                         conVacantes
-                                ? cb.greaterThan(vacantes, 0)
-                                : cb.equal(vacantes, 0)
+                                ? cb.greaterThan(root.get("vacantes"), 0)
+                                : cb.equal(root.get("vacantes"), 0)
                 );
             }
 
-            Expression<?> expresionOrden = campoOrden.equals("nombre")
-                    ? root.get(campoOrden)
-                    : root.get(campoOrden).as(Integer.class);
-
             query.orderBy(
                     descendente
-                            ? cb.desc(expresionOrden)
-                            : cb.asc(expresionOrden)
+                            ? cb.desc(root.get(campoOrden))
+                            : cb.asc(root.get(campoOrden))
             );
 
             return cb.and(condiciones.toArray(Predicate[]::new));
@@ -193,9 +187,9 @@ public class CursoServiceImpl implements CursoService {
     ) {
         curso.setCodigo(codigo);
         curso.setNombre(request.getNombre().trim());
-        curso.setCreditos(request.getCreditos().toString());
-        curso.setCiclo(request.getCiclo().toString());
-        curso.setVacantes(request.getVacantes().toString());
+        curso.setCreditos(request.getCreditos());
+        curso.setCiclo(request.getCiclo());
+        curso.setVacantes(request.getVacantes());
         curso.setCarrera(carrera);
 
         if (request.getEstado() != null) {
@@ -254,9 +248,9 @@ public class CursoServiceImpl implements CursoService {
                 curso.getId(),
                 curso.getCodigo(),
                 curso.getNombre(),
-                Integer.valueOf(curso.getCreditos()),
-                Integer.valueOf(curso.getCiclo()),
-                Integer.valueOf(curso.getVacantes()),
+                curso.getCreditos(),
+                curso.getCiclo(),
+                curso.getVacantes(),
                 curso.getEstado(),
                 curso.getCarrera().getId(),
                 curso.getCarrera().getNombre(),
