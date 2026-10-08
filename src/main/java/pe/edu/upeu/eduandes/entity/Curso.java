@@ -1,7 +1,10 @@
 package pe.edu.upeu.eduandes.entity;
 
 import jakarta.persistence.*;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.Pattern;
+import jakarta.validation.constraints.PositiveOrZero;
 import jakarta.validation.constraints.Size;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -23,15 +26,17 @@ public class Curso {
     @Column(nullable = false, length = 150)
     @Size(min = 3, max = 150)
     private String nombre;
-    @Column(nullable = false,length = 6)
-    @Size(min = 1, max = 6)
-    private String creditos;
-    @Column(nullable = false, length = 10)
-    @Size(min = 1, max = 10)
-    private String ciclo;
     @Column(nullable = false)
-    @Size(min = 0)
-    private String vacantes;
+    @Min(1)
+    @Max(6)
+    private Integer creditos;
+    @Column(nullable = false)
+    @Min(1)
+    @Max(10)
+    private Integer ciclo;
+    @Column(nullable = false)
+    @PositiveOrZero
+    private Integer vacantes;
     @Column(nullable = false)
     private Boolean estado;
     @ManyToOne(fetch = FetchType.LAZY, optional = false)

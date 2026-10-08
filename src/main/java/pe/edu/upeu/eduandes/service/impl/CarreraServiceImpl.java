@@ -12,6 +12,7 @@ import pe.edu.upeu.eduandes.exception.RecursoNoEncontradoException;
 import pe.edu.upeu.eduandes.exception.ReglaNegocioException;
 import pe.edu.upeu.eduandes.repository.CarreraRepository;
 import pe.edu.upeu.eduandes.repository.CursoRepository;
+import pe.edu.upeu.eduandes.repository.EstudianteRepository;
 import pe.edu.upeu.eduandes.service.service.CarreraService;
 
 import java.util.List;
@@ -24,6 +25,7 @@ public class CarreraServiceImpl implements CarreraService {
 
     private final CarreraRepository carreraRepository;
     private final CursoRepository cursoRepository;
+    private final EstudianteRepository estudianteRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -98,10 +100,11 @@ public class CarreraServiceImpl implements CarreraService {
     public void delete(Long id) {
         Carrera carrera = buscarEntidad(id);
 
-        if (cursoRepository.countByCarreraId(id) > 0) {
-            log.warn("No se puede eliminar la carrera {} porque tiene cursos", id);
+        if (cursoRepository.countByCarreraId(id) > 0
+                || estudianteRepository.existsByCarreraId(id)) {
+            log.warn("No se puede eliminar la carrera {} porque tiene relaciones", id);
             throw new ReglaNegocioException(
-                    "No se puede eliminar una carrera que tiene cursos"
+                    "No se puede eliminar una carrera que tiene cursos o estudiantes"
             );
         }
 

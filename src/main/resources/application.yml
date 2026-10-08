@@ -1,0 +1,10 @@
+spring:
+  application:
+    name: eduandes
+  profiles:
+    default: dev
+  jpa:
+    open-in-view: false
+
+matricula:
+  costo-credito: 120.00

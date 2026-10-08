@@ -1,7 +1,6 @@
 package pe.edu.upeu.eduandes.service.impl;
 
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -14,38 +13,38 @@ import pe.edu.upeu.eduandes.entity.DetalleMatricula;
 import pe.edu.upeu.eduandes.entity.Estudiante;
 import pe.edu.upeu.eduandes.entity.Matricula;
 import pe.edu.upeu.eduandes.enums.EstadoMatricula;
+import pe.edu.upeu.eduandes.exception.RecursoNoEncontradoException;
+import pe.edu.upeu.eduandes.exception.ReglaNegocioException;
 import pe.edu.upeu.eduandes.repository.CursoRepository;
 import pe.edu.upeu.eduandes.repository.EstudianteRepository;
 import pe.edu.upeu.eduandes.repository.MatriculaRepository;
 import pe.edu.upeu.eduandes.service.service.MatriculaService;
 
 import java.math.BigDecimal;
-import java.time.LocalDate;
+import java.math.RoundingMode;
 import java.time.LocalDateTime;
-import java.time.LocalTime;
 import java.util.HashSet;
 import java.util.List;
-import java.util.NoSuchElementException;
 import java.util.Set;
 
 @Service
 public class MatriculaServiceImpl implements MatriculaService {
-    private static final Logger log = LoggerFactory.getLogger(MatriculaServiceImpl.class);
-    private static final Set<String> CAMPOS_ORDENABLES = Set.of(
-            "id", "fecha", "periodo", "estado", "totalCreditos", "montoTotal");
     private static final String ORDEN_POR_DEFECTO = "fecha";
 
     private final MatriculaRepository matriculaRepository;
     private final EstudianteRepository estudianteRepository;
     private final CursoRepository cursoRepository;
+    private final BigDecimal costoCredito;
 
     public MatriculaServiceImpl(
             MatriculaRepository matriculaRepository,
             EstudianteRepository estudianteRepository,
-            CursoRepository cursoRepository) {
+            CursoRepository cursoRepository,
+            @Value("${matricula.costo-credito:120.00}") BigDecimal costoCredito) {
         this.matriculaRepository = matriculaRepository;
         this.estudianteRepository = estudianteRepository;
         this.cursoRepository = cursoRepository;
+        this.costoCredito = costoCredito;
     }
 
     @Override
@@ -58,11 +57,16 @@ public class MatriculaServiceImpl implements MatriculaService {
             throw new IllegalArgumentException("Debe registrar al menos un curso en la matrícula");
         }
 
-        Estudiante estudiante = estudianteRepository.findById(request.getEstudianteId())
-                .orElseThrow(() -> new NoSuchElementException(
+        Estudiante estudiante = estudianteRepository.findByIdForUpdate(request.getEstudianteId())
+                .orElseThrow(() -> new RecursoNoEncontradoException(
                         "Estudiante no encontrado con id: " + request.getEstudianteId()));
         if (!Boolean.TRUE.equals(estudiante.getEstado())) {
-            throw new IllegalArgumentException("No se puede matricular a un estudiante inactivo");
+            throw new ReglaNegocioException("No se puede matricular a un estudiante inactivo");
+        }
+        if (matriculaRepository.existsByEstudianteIdAndPeriodoAndEstado(
+                estudiante.getId(), request.getPeriodo(), EstadoMatricula.REGISTRADA)) {
+            throw new ReglaNegocioException(
+                    "El estudiante ya tiene una matrícula registrada en el periodo " + request.getPeriodo());
         }
 
         Matricula matricula = new Matricula();
@@ -80,43 +84,48 @@ public class MatriculaServiceImpl implements MatriculaService {
                 throw new IllegalArgumentException("Cada detalle debe incluir un curso");
             }
             if (!cursosIncluidos.add(item.getCursoId())) {
-                throw new IllegalArgumentException("El curso " + item.getCursoId()
+                throw new ReglaNegocioException("El curso " + item.getCursoId()
                         + " está repetido en la matrícula");
             }
 
-            Curso curso = cursoRepository.findById(item.getCursoId())
-                    .orElseThrow(() -> new NoSuchElementException(
+            Curso curso = cursoRepository.findByIdForUpdate(item.getCursoId())
+                    .orElseThrow(() -> new RecursoNoEncontradoException(
                             "Curso no encontrado con id: " + item.getCursoId()));
             if (!Boolean.TRUE.equals(curso.getEstado())) {
-                throw new IllegalArgumentException("El curso " + curso.getNombre() + " está inactivo");
+                throw new ReglaNegocioException("El curso " + curso.getNombre() + " está inactivo");
             }
-            if (item.getCreditos() == null || item.getCreditos() <= 0) {
-                throw new IllegalArgumentException("Los créditos del curso deben ser mayores que cero");
-            }
-            if (item.getCosto() == null || item.getCosto().signum() < 0) {
-                throw new IllegalArgumentException("El costo del curso no puede ser negativo");
+            if (!curso.getCarrera().getId().equals(estudiante.getCarrera().getId())) {
+                throw new ReglaNegocioException("El curso " + curso.getNombre()
+                        + " no pertenece a la carrera del estudiante");
             }
 
-            int vacantesDisponibles;
-            try {
-                vacantesDisponibles = Integer.parseInt(curso.getVacantes());
-            } catch (NumberFormatException ex) {
-                throw new IllegalArgumentException("Las vacantes del curso " + curso.getNombre()
-                        + " no tienen un valor válido", ex);
+            int creditos = curso.getCreditos();
+            if (creditos <= 0) {
+                throw new ReglaNegocioException("Los créditos del curso deben ser mayores que cero");
             }
+
+            int vacantesDisponibles = curso.getVacantes();
             if (vacantesDisponibles <= 0) {
-                throw new IllegalArgumentException("El curso " + curso.getNombre() + " no tiene vacantes disponibles");
+                throw new ReglaNegocioException(
+                        "El curso " + curso.getNombre() + " no tiene vacantes disponibles");
             }
+
+            totalCreditos = Math.addExact(totalCreditos, creditos);
+            if (totalCreditos > 20) {
+                throw new ReglaNegocioException("La matrícula no puede superar los 20 créditos");
+            }
+            BigDecimal costo = costoCredito
+                    .multiply(BigDecimal.valueOf(creditos))
+                    .setScale(2, RoundingMode.HALF_UP);
 
             DetalleMatricula detalle = new DetalleMatricula();
             detalle.setCurso(curso);
-            detalle.setCreditos(item.getCreditos());
-            detalle.setCosto(item.getCosto());
+            detalle.setCreditos(creditos);
+            detalle.setCosto(costo);
             matricula.agregarDetalle(detalle);
 
-            curso.setVacantes(Integer.toString(vacantesDisponibles - 1));
-            totalCreditos = Math.addExact(totalCreditos, item.getCreditos());
-            montoTotal = montoTotal.add(item.getCosto());
+            curso.setVacantes(vacantesDisponibles - 1);
+            montoTotal = montoTotal.add(costo);
         }
 
         matricula.setTotalCreditos(totalCreditos);
@@ -129,8 +138,28 @@ public class MatriculaServiceImpl implements MatriculaService {
     @Transactional(readOnly = true)
     public MatriculaResponseDTO buscar(Long id) {
         Matricula matricula = matriculaRepository.findById(id)
-                .orElseThrow(() -> new NoSuchElementException("Matrícula no encontrada con id: " + id));
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "Matrícula no encontrada con id: " + id));
         return convertirResponse(matricula);
+    }
+
+    @Override
+    @Transactional
+    public MatriculaResponseDTO anular(Long id) {
+        Matricula matricula = matriculaRepository.findByIdForUpdate(id)
+                .orElseThrow(() -> new RecursoNoEncontradoException(
+                        "Matrícula no encontrada con id: " + id));
+        if (matricula.getEstado() == EstadoMatricula.ANULADA) {
+            throw new ReglaNegocioException("La matrícula ya está anulada");
+        }
+
+        for (DetalleMatricula detalle : matricula.getDetalles()) {
+            Curso curso = detalle.getCurso();
+            curso.setVacantes(curso.getVacantes() + 1);
+        }
+
+        matricula.setEstado(EstadoMatricula.ANULADA);
+        return convertirResponse(matriculaRepository.save(matricula));
     }
 
     @Override
@@ -140,53 +169,6 @@ public class MatriculaServiceImpl implements MatriculaService {
                 .stream()
                 .map(this::convertirResponse)
                 .toList();
-    }
-
-    @Override
-    @Transactional(readOnly = true)
-    public List<MatriculaResponseDTO> buscarMatriculas(
-            Long estudianteId,
-            EstadoMatricula estado,
-            LocalDate desde,
-            LocalDate hasta,
-            String ordenarPor,
-            String direccion) {
-        long inicio = System.currentTimeMillis();
-        log.info("Inicio buscar matrículas | estudianteId={} | estado={} | desde={} | hasta={}",
-                estudianteId, estado, desde, hasta);
-
-        if (desde != null && hasta != null && desde.isAfter(hasta)) {
-            throw new IllegalArgumentException("El rango de fechas es inválido: 'desde' es posterior a 'hasta'");
-        }
-
-        String campo = (ordenarPor == null || ordenarPor.isBlank())
-                ? ORDEN_POR_DEFECTO : ordenarPor.trim();
-        if (!CAMPOS_ORDENABLES.contains(campo)) {
-            throw new IllegalArgumentException("Campo de ordenamiento no permitido: " + campo
-                    + ". Campos válidos: " + CAMPOS_ORDENABLES);
-        }
-        String sentido = (direccion == null || direccion.isBlank()) ? "desc" : direccion.trim();
-        if (!sentido.equalsIgnoreCase("asc") && !sentido.equalsIgnoreCase("desc")) {
-            throw new IllegalArgumentException("Dirección de ordenamiento no permitida: " + sentido
-                    + ". Valores válidos: asc, desc");
-        }
-
-        LocalDateTime desdeHora = desde == null ? null : desde.atStartOfDay();
-        LocalDateTime hastaHora = hasta == null ? null : hasta.atTime(LocalTime.MAX);
-        Sort sort = "asc".equalsIgnoreCase(sentido)
-                ? Sort.by(campo).ascending() : Sort.by(campo).descending();
-
-        List<MatriculaResponseDTO> resultado = matriculaRepository.findAll(sort).stream()
-                .filter(m -> estudianteId == null || m.getEstudiante().getId().equals(estudianteId))
-                .filter(m -> estado == null || m.getEstado() == estado)
-                .filter(m -> desdeHora == null || !m.getFecha().isBefore(desdeHora))
-                .filter(m -> hastaHora == null || !m.getFecha().isAfter(hastaHora))
-                .map(this::convertirResponse)
-                .toList();
-
-        log.info("Fin buscar matrículas | filas={} | duracionMs={}",
-                resultado.size(), System.currentTimeMillis() - inicio);
-        return resultado;
     }
 
     private MatriculaResponseDTO convertirResponse(Matricula matricula) {

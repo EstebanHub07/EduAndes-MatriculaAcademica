@@ -1,7 +1,6 @@
 package pe.edu.upeu.eduandes.controller;
 
 
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -10,7 +9,6 @@ import org.springframework.web.bind.annotation.RestController;
 import pe.edu.upeu.eduandes.dto.reporte.MatriculadosPorCursoDTO;
 import pe.edu.upeu.eduandes.service.service.ReporteService;
 
-import java.time.LocalDate;
 import java.util.List;
 
 @RestController
@@ -28,17 +26,11 @@ public class ReporteController {
 
     @GetMapping("/matriculados-por-curso")
     public ResponseEntity<List<MatriculadosPorCursoDTO>> matriculadosPorCurso(
-
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate desde,
-
-            @RequestParam(required = false)
-            @DateTimeFormat(iso = DateTimeFormat.ISO.DATE)
-            LocalDate hasta) {
+            @RequestParam String periodo,
+            @RequestParam(required = false) Long carreraId) {
 
         return ResponseEntity.ok(
-                reporteService.matriculadosPorCurso(desde, hasta)
+                reporteService.matriculadosPorCurso(periodo, carreraId)
         );
     }
 }

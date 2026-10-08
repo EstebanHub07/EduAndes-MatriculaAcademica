@@ -53,6 +53,11 @@ public class Matricula {
         }
     }
 
+    @PreUpdate
+    public void preUpdate() {
+        this.fechaModificacion = LocalDateTime.now();
+    }
+
     public void agregarDetalle(DetalleMatricula detalle) {
         detalles.add(detalle);
         detalle.setMatricula(this);

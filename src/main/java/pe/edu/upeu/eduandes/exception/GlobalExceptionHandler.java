@@ -4,10 +4,13 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.servlet.resource.NoResourceFoundException;
 import pe.edu.upeu.eduandes.exception.dto.ErrorResponseDTO;
 
 import java.time.LocalDateTime;
@@ -29,6 +32,14 @@ public class GlobalExceptionHandler {
                 request,
                 null
         );
+    }
+
+    @ExceptionHandler(NoResourceFoundException.class)
+    public ResponseEntity<ErrorResponseDTO> handleNoResource(
+            NoResourceFoundException ex,
+            HttpServletRequest request
+    ) {
+        return construirRespuesta(HttpStatus.NOT_FOUND, "Recurso no encontrado", request, null);
     }
 
     @ExceptionHandler(ReglaNegocioException.class)
@@ -78,6 +89,32 @@ public class GlobalExceptionHandler {
         return construirRespuesta(
                 HttpStatus.BAD_REQUEST,
                 mensaje,
+                request,
+                null
+        );
+    }
+
+    @ExceptionHandler(MissingServletRequestParameterException.class)
+    public ResponseEntity<ErrorResponseDTO> handleMissingParameter(
+            MissingServletRequestParameterException ex,
+            HttpServletRequest request
+    ) {
+        return construirRespuesta(
+                HttpStatus.BAD_REQUEST,
+                "El parámetro '" + ex.getParameterName() + "' es obligatorio",
+                request,
+                null
+        );
+    }
+
+    @ExceptionHandler(HttpMessageNotReadableException.class)
+    public ResponseEntity<ErrorResponseDTO> handleUnreadableMessage(
+            HttpMessageNotReadableException ex,
+            HttpServletRequest request
+    ) {
+        return construirRespuesta(
+                HttpStatus.BAD_REQUEST,
+                "El cuerpo de la solicitud no tiene un formato válido",
                 request,
                 null
         );

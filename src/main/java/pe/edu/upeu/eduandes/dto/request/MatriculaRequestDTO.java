@@ -1,5 +1,6 @@
 package pe.edu.upeu.eduandes.dto.request;
 
+import jakarta.validation.Valid;
 import jakarta.validation.constraints.*;
 import lombok.AllArgsConstructor;
 import lombok.Data;
@@ -20,5 +21,6 @@ public class MatriculaRequestDTO {
     private Long estudianteId;
 
     @NotEmpty(message = "Debe registrar al menos un curso en la matrícula")
+    @Valid
     private List<DetalleMatriculaRequestDTO> detalles;
 }
